@@ -1,11 +1,14 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex">
+<meta name="googlebot" content="noindex, nofollow">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>SUWED SWV — v3.1.1</title>
+<meta name="referrer" content="no-referrer">
+<title>Skin-Biosense</title>
 <style>
   :root{
     --bg:#10161a;
@@ -14,7 +17,7 @@
     --line:#2b3a42;
     --ink:#e6eef1;
     --ink-dim:#8fa3ad;
-    --trace:#7be38c;      /* phosphor trace, like a bench instrument */
+    --trace:#7be38c;
     --primary:#3f8fd6;
     --warn:#e8a33d;
     --bad:#e2685f;
@@ -28,8 +31,8 @@
   }
   .mono{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-variant-numeric:tabular-nums}
 
-  header{display:flex;align-items:baseline;gap:12px;padding:14px 0 10px}
-  header h1{font-size:19px;font-weight:600;margin:0;letter-spacing:.2px}
+  header{display:flex;align-items:baseline;gap:10px;padding:14px 0 10px;flex-wrap:wrap}
+  header h1{font-size:20px;font-weight:600;margin:0;letter-spacing:.2px}
   header .ver{color:var(--ink-dim);font-size:13px}
 
   .status{
@@ -42,13 +45,12 @@
   .dot.busy{background:var(--warn)}
   #statusText{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
-  /* Plot is the hero: the voltammogram is what the operator watches. */
+  .sample{margin-bottom:12px}
+  .sample input{font-size:17px;min-height:52px}
+
   .plotwrap{position:relative;background:#0b1114;border:1px solid var(--line);border-radius:10px;overflow:hidden}
   canvas{display:block;width:100%;height:340px}
-  .plotmeta{
-    position:absolute;top:8px;right:12px;font-size:12px;color:var(--ink-dim);
-    text-align:right;pointer-events:none
-  }
+  .plotmeta{position:absolute;top:8px;right:12px;font-size:12px;color:var(--ink-dim);text-align:right;pointer-events:none}
 
   .row{display:flex;gap:10px;margin:12px 0}
   button{
@@ -80,14 +82,10 @@
   }
   input:focus,select:focus{outline:2px solid var(--primary);outline-offset:0}
   select{font-family:inherit}
-
-  table.derived{width:100%;border-collapse:collapse;font-size:14px;margin-top:6px}
-  table.derived td{padding:5px 0;border-bottom:1px solid var(--line)}
-  table.derived td:last-child{text-align:right;font-family:ui-monospace,"SF Mono",Menlo,monospace;font-variant-numeric:tabular-nums}
-  table.derived tr:last-child td{border-bottom:none}
+  input::placeholder{color:#5d717b;font-family:-apple-system,system-ui,sans-serif}
 
   #log{
-    height:180px;overflow:auto;background:#0b1114;border:1px solid var(--line);
+    height:170px;overflow:auto;background:#0b1114;border:1px solid var(--line);
     border-radius:8px;padding:10px;font-size:12px;line-height:1.5;
     font-family:ui-monospace,"SF Mono",Menlo,monospace;white-space:pre-wrap;word-break:break-all;
   }
@@ -96,33 +94,35 @@
   #log .err{color:var(--bad)}
   #log .ok{color:var(--trace)}
 
-  .note{font-size:13px;color:var(--ink-dim);margin:8px 0 0}
-  .cb{display:flex;gap:10px;align-items:flex-start;margin-top:12px;font-size:14px;color:var(--ink)}
-  .cb input{width:22px;height:22px;min-height:0;flex:none;margin-top:2px}
+  .note{font-size:13px;color:var(--ink-dim);margin:10px 0 0}
+  .cb{display:flex;gap:10px;align-items:center;margin-top:14px;font-size:15px;color:var(--ink)}
+  .cb input{width:24px;height:24px;min-height:0;flex:none}
+  .path{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:12px;color:var(--ink-dim);
+        word-break:break-all;margin-top:10px;line-height:1.6}
 
   dialog{
     border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);
-    padding:18px;max-width:520px;width:calc(100% - 32px);
+    padding:20px;max-width:480px;width:calc(100% - 32px);
   }
-  dialog::backdrop{background:rgba(0,0,0,.6)}
-  dialog h2{margin:0 0 12px;font-size:17px}
-  textarea{
-    width:100%;height:150px;background:#0d1417;color:var(--ink);border:1px solid var(--line);
-    border-radius:8px;padding:10px;font:12px/1.5 ui-monospace,"SF Mono",Menlo,monospace;
-  }
+  dialog::backdrop{background:rgba(0,0,0,.65)}
+  dialog h2{margin:0 0 14px;font-size:18px}
 </style>
 </head>
 <body>
 
 <header>
-  <h1>SUWED — voltampérométrie à onde carrée</h1>
-  <span class="ver mono">v3.1.1</span>
+  <h1>Skin-Biosense</h1>
+  <span class="ver mono">version 4.0.0</span>
 </header>
 
 <div class="status">
   <span class="dot" id="dot"></span>
-  <span id="statusText">Non connecté</span>
-  <span class="mono" id="ptCount" style="color:var(--ink-dim);font-size:13px"></span>
+  <span id="statusText">Not connected</span>
+</div>
+
+<div class="sample">
+  <label for="sampleName">Sample name</label>
+  <input id="sampleName" type="text" placeholder="" autocapitalize="none" spellcheck="false">
 </div>
 
 <div class="plotwrap">
@@ -131,28 +131,28 @@
 </div>
 
 <div class="row">
-  <button id="btnConnect" class="primary">Connecter</button>
-  <button id="btnInit" disabled>Init</button>
+  <button id="btnConnect" class="primary">Connect</button>
+  <button id="btnInit" disabled>Initialize</button>
 </div>
 <div class="row">
-  <button id="btnStart" class="go" disabled>Démarrer</button>
-  <button id="btnOff" class="off" disabled>Éteindre</button>
+  <button id="btnStart" class="go" disabled>Start</button>
+  <button id="btnOff" class="off" disabled>Switch off</button>
 </div>
 <div class="row">
-  <button id="btnExport" class="small" disabled>Exporter les données</button>
-  <button id="btnClear" class="small" disabled>Effacer la courbe</button>
+  <button id="btnExport" class="small" disabled>Export</button>
+  <button id="btnClear" class="small" disabled>Erase graph</button>
 </div>
 
-<details open>
-  <summary>Paramètres SWV</summary>
+<details>
+  <summary>Measurement parameters</summary>
   <div class="body">
     <div class="grid">
-      <div><label for="V_start">Potentiel initial (V)</label><input id="V_start" type="text" inputmode="decimal" value="-0.4"></div>
-      <div><label for="V_end">Potentiel final (V)</label><input id="V_end" type="text" inputmode="decimal" value="2"></div>
-      <div><label for="freq">Fréquence (Hz)</label><input id="freq" type="text" inputmode="decimal" value="25"></div>
-      <div><label for="V_step">Pas (mV)</label><input id="V_step" type="text" inputmode="decimal" value="5"></div>
+      <div><label for="V_start">Start (V)</label><input id="V_start" type="text" inputmode="decimal" value="-0.4"></div>
+      <div><label for="V_end">End (V)</label><input id="V_end" type="text" inputmode="decimal" value="2"></div>
+      <div><label for="freq">Frequency (Hz)</label><input id="freq" type="text" inputmode="decimal" value="25"></div>
+      <div><label for="V_step">Step (mV)</label><input id="V_step" type="text" inputmode="decimal" value="5"></div>
       <div><label for="V_amp">Amplitude (mV)</label><input id="V_amp" type="text" inputmode="decimal" value="25"></div>
-      <div><label for="t_wait">Attente avant scan (ms)</label><input id="t_wait" type="text" inputmode="numeric" value="2000"></div>
+      <div><label for="t_wait">Wait time (ms)</label><input id="t_wait" type="text" inputmode="numeric" value="2000"></div>
       <div>
         <label for="GAIN">Gain</label>
         <select id="GAIN">
@@ -163,133 +163,111 @@
           <option value="6">6 — auto</option>
         </select>
       </div>
-      <div>
-        <label for="TransmissionMode">Transmission</label>
-        <select id="TransmissionMode">
-          <option value="0">0 — en fin de mesure</option>
-          <option value="1" selected>1 — pendant la mesure</option>
-        </select>
-      </div>
-      <div><label for="ShutDownTime">Extinction auto (s)</label><input id="ShutDownTime" type="text" inputmode="numeric" value="120"></div>
+      <div><label for="ShutDownTime">Auto-off (s)</label><input id="ShutDownTime" type="text" inputmode="numeric" value="120"></div>
     </div>
-    <table class="derived" id="derived"></table>
   </div>
 </details>
 
 <details>
-  <summary>Calibration et compatibilité</summary>
+  <summary>OneDrive</summary>
   <div class="body">
-    <div class="grid">
-      <div><label for="pot_a">pot_a (V/dig)</label><input id="pot_a" type="text" inputmode="decimal" value="-80.7662e-6"></div>
-      <div><label for="pot_b">pot_b (V)</label><input id="pot_b" type="text" inputmode="decimal" value="2.99969"></div>
-      <div>
-        <label for="intMode">Conversion réel → entier</label>
-        <select id="intMode">
-          <option value="round" selected>Arrondi (round)</option>
-          <option value="trunc">Troncature (trunc)</option>
-        </select>
-      </div>
-    </div>
-    <table class="derived" id="calTable"></table>
-    <label class="cb">
-      <input type="checkbox" id="applyDac">
-      <span>Appliquer la calibration DAC lue par « Init » à l'axe des potentiels (pot_a / pot_b).
-      Ajout par rapport au techBASIC, qui lit ces registres sans les utiliser. Décoché = comportement identique à l'original.</span>
-    </label>
+    <div id="odStatus" class="note" style="margin-top:0"></div>
+    <div class="row"><button class="small" id="btnOd">Sign in to OneDrive</button></div>
+    <div class="path" id="odPath"></div>
+    <p class="note">Sign in before starting a measurement: the Microsoft sign-in reloads the page and would clear an unsaved curve.</p>
   </div>
 </details>
 
 <details>
-  <summary>Journal BLE</summary>
+  <summary>BLE log</summary>
   <div class="body">
     <div id="log" class="mono"></div>
-    <div class="row"><button class="small" id="btnClearLog">Vider le journal</button></div>
+    <div class="row"><button class="small" id="btnClearLog">Clear log</button></div>
   </div>
 </details>
 
-<dialog id="dlgExport">
-  <h2>Exporter la mesure</h2>
-  <label for="fname">Nom du fichier</label>
-  <input id="fname" type="text" value="mesure">
-  <p class="note" id="expInfo"></p>
-  <textarea id="expText" readonly></textarea>
+<dialog id="dlgSave">
+  <h2>Save measurement</h2>
+  <label for="fname">File name</label>
+  <input id="fname" type="text" value="mesure" autocapitalize="none" spellcheck="false">
+  <div class="path" id="savePath"></div>
+  <label class="cb"><input type="checkbox" id="localCopy"><span>Also keep a local copy on this device</span></label>
   <div class="row">
-    <button class="small" id="btnCopy">Copier</button>
-    <button class="small primary" id="btnShare">Partager / Enregistrer</button>
+    <button class="small" id="btnCancelSave">Cancel</button>
+    <button class="small primary" id="btnDoSave">Save</button>
   </div>
-  <div class="row"><button class="small" id="btnCloseDlg">Fermer</button></div>
 </dialog>
 
 <script>
 "use strict";
 /* ============================================================================
-   SUWED SWV — portage du programme techBASIC "SUWED1.5 / v3.1.1" (Fluika OÜ)
-   vers Web Bluetooth. Fonctionne dans un navigateur exposant navigator.bluetooth
-   (sur iPad : Bluefy ou WebBLE ; Safari n'expose pas Web Bluetooth).
-
-   Le protocole, la pile de commandes, le décodage des trames et le calcul SWV
-   reproduisent le .bas d'origine. Les écarts sont signalés par [DIFF].
+   Skin-Biosense v4.0.0
+   Port of the techBASIC "SUWED" program (Fluika OÜ) to Web Bluetooth.
+   Runs in any browser exposing navigator.bluetooth — Bluefy / WebBLE on iPadOS,
+   Chrome / Edge on Android. Deviations from the .bas are marked [DIFF].
    ========================================================================== */
 
-/* --- Service Nordic UART, tel que dans le .bas (UUID en minuscules) -------- */
+/* --- Nordic UART service, as in the .bas (lowercase UUIDs) ---------------- */
 const NUS_SERVICE = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
-const NUS_WRITE   = '6e400002-b5a3-f393-e0a9-e50e24dcca9e'; // app -> appareil
-const NUS_NOTIFY  = '6e400003-b5a3-f393-e0a9-e50e24dcca9e'; // appareil -> app
+const NUS_WRITE   = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
+const NUS_NOTIFY  = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
 
-/* techBASIC STR() ajoute un espace devant les nombres positifs dans certains
-   dialectes BASIC. Le firmware accepte la forme produite par l'original ; si
-   les commandes sont rejetées, passer cette constante à true. [À VÉRIFIER] */
-const PARAM_LEADING_SPACE = false;
+/* --- Fixed protocol constants (no longer exposed in the UI) --------------- */
+const TRANSMISSION_MODE = 1;        // 1 = stream during the measurement
+const PARAM_LEADING_SPACE = false;  // set true if the firmware expects "A( 42093)"
+const INT_MODE = 'round';           // 'round' | 'trunc' — see release notes
+const NR_DATA_POINTS = 1510;
 
-const NR_DATA_POINTS = 1510; // borne du .bas, conservée comme garde-fou
+/* --- Azure AD application (fill in after IT registers the app) ------------ */
+const MS_CLIENT_ID = '';            // <<< client ID from Azure AD
+const MS_SCOPES = 'Files.ReadWrite offline_access openid profile';
+const MS_AUTH   = 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize';
+const MS_TOKEN  = 'https://login.microsoftonline.com/common/oauth2/v2.0/token';
+const OD_ROOT   = 'SUWED v4';
 
-/* --- État ------------------------------------------------------------------ */
+/* --- Calibration (default values from the .bas, overwritten by Initialize) - */
 const cal = {
   pot_a: -80.7662e-6,
   pot_b: 2.99969,
-  ADC_a: [3.915487e-2, 4.014471e-3, 4.026303e-4, 3.861204e-5], // µA/dig
-  ADC_b: [-1.166343e3, -1.195791e2, -1.199943e1, -1.140467],   // µA
+  ADC_a: [3.915487e-2, 4.014471e-3, 4.026303e-4, 3.861204e-5],
+  ADC_b: [-1.166343e3, -1.195791e2, -1.199943e1, -1.140467],
   DAC_a: null, DAC_b: null
 };
 
-let cfg = {};
-let der = {};
-
+let cfg = {}, der = {};
 let dev = null, gatt = null, chWrite = null, chNotify = null;
 let devName = '';
-let comMODE = 0;            // 0 = init/registres, 1 = mesure
+let comMODE = 0;
 let userDisconnect = false;
-
 const cs = { names:[], params:[], ri:0, run:0, wait:0 };
 let regs = [], regsi = 0;
-
-let pts = [];               // points bruts : {G, Ts, dVr, Vr, dADC, IuA}
-let lastIndex = -1;
+let pts = [], lastIndex = -1;
 let watchdog = null, retries = 0;
+let measuredSample = '';
 
-/* --- Utilitaires ----------------------------------------------------------- */
+/* --- Helpers -------------------------------------------------------------- */
 const $ = id => document.getElementById(id);
-const num = (id, dflt) => { const v = parseFloat($(id).value.replace(',', '.')); return Number.isFinite(v) ? v : dflt; };
-const toInt = x => cfg.intMode === 'trunc' ? Math.trunc(x) : Math.round(x);
+const num = (id, d) => { const v = parseFloat($(id).value.replace(',', '.')); return Number.isFinite(v) ? v : d; };
+const toInt = x => INT_MODE === 'trunc' ? Math.trunc(x) : Math.round(x);
 
 function log(msg, cls) {
-  const el = $('log');
-  const t = new Date().toISOString().substr(11, 8);
-  const span = document.createElement('span');
-  span.className = cls || '';
-  span.textContent = t + '  ' + msg + '\n';
-  el.appendChild(span);
+  const el = $('log'), t = new Date().toISOString().substr(11, 8);
+  const s = document.createElement('span');
+  s.className = cls || ''; s.textContent = t + '  ' + msg + '\n';
+  el.appendChild(s);
   while (el.childNodes.length > 400) el.removeChild(el.firstChild);
   el.scrollTop = el.scrollHeight;
 }
-
 function setStatus(text, state) {
   $('statusText').textContent = text;
-  const d = $('dot');
-  d.className = 'dot' + (state ? ' ' + state : '');
+  $('dot').className = 'dot' + (state ? ' ' + state : '');
 }
+function sanitize(s) {
+  return (s || '').trim().replace(/[\\/:*?"<>|#%]/g, '-').replace(/\s+/g, '_').slice(0, 80);
+}
+function today() { return new Date().toLocaleDateString('sv-SE'); }  // YYYY-MM-DD, local time
 
-/* --- Paramètres et grandeurs dérivées (bloc de tête du .bas) --------------- */
+/* --- Parameters and derived registers (head of the .bas) ------------------ */
 function readConfig() {
   cfg = {
     V_start: num('V_start', -0.4),
@@ -299,80 +277,33 @@ function readConfig() {
     V_amp:   num('V_amp', 25),
     t_wait:  Math.round(num('t_wait', 2000)),
     GAIN:    parseInt($('GAIN').value, 10),
-    TransmissionMode: parseInt($('TransmissionMode').value, 10),
-    ShutDownTime: Math.round(num('ShutDownTime', 120)),
-    intMode: $('intMode').value
+    ShutDownTime: Math.round(num('ShutDownTime', 120))
   };
-  cal.pot_a = num('pot_a', -80.7662e-6);
-  cal.pot_b = num('pot_b', 2.99969);
   computeDerived();
-  renderDerived();
-  renderCal();
 }
-
 function computeDerived() {
-  const a = cal.pot_a, b = cal.pot_b;
-  const d = {};
+  const a = cal.pot_a, b = cal.pot_b, d = {};
   d.D_start = toInt((cfg.V_start - b) / a);
-  d.V_start_real = d.D_start * a + b;
-
-  d.D_T = toInt(500.0 / cfg.freq);
-  d.freq_real = 500.0 / d.D_T;
-
-  d.D_step = toInt(cfg.V_step / (1000 * Math.abs(a)));
-  d.step_real = d.D_step * (1000 * Math.abs(a));
-
-  d.D_amp = toInt(cfg.V_amp / (1000 * Math.abs(a)));
-  d.amp_real = d.D_amp * (1000 * Math.abs(a));
-
-  d.N_Steps = 0; d.tooMany = false;
+  d.D_T     = toInt(500.0 / cfg.freq);
+  d.D_step  = toInt(cfg.V_step / (1000 * Math.abs(a)));
+  d.D_amp   = toInt(cfg.V_amp / (1000 * Math.abs(a)));
+  d.N_Steps = 0;
   if (cfg.V_step > 0) {
     d.N_Steps = toInt(2000 * Math.abs(cfg.V_start - cfg.V_end) / cfg.V_step);
-    if (d.N_Steps > 1500) { d.N_Steps = 1500; d.tooMany = true; }
+    if (d.N_Steps > 1500) { d.N_Steps = 1500; log('Too many points, capped at 1500', 'err'); }
   }
-  d.V_end_real = (cfg.V_end > cfg.V_start)
-    ? (d.D_start - (d.D_step * d.N_Steps / 2)) * a + b
-    : (d.D_start + (d.D_step * d.N_Steps / 2)) * a + b;
   der = d;
 }
 
-function renderDerived() {
-  const f = (x, n) => Number(x).toFixed(n === undefined ? 4 : n);
-  const rows = [
-    ['Potentiel initial appliqué', f(der.V_start_real) + ' V'],
-    ['Potentiel final appliqué',   f(der.V_end_real) + ' V'],
-    ['Fréquence effective',        f(der.freq_real, 2) + ' Hz'],
-    ['Pas effectif',               f(der.step_real, 3) + ' mV'],
-    ['Amplitude effective',        f(der.amp_real, 3) + ' mV'],
-    ['Nombre de points',           String(der.N_Steps) + (der.tooMany ? ' (plafonné)' : '')],
-    ['Registres D_start / D_T / D_step / D_amp',
-      [der.D_start, der.D_T, der.D_step, der.D_amp].join(' / ')]
-  ];
-  $('derived').innerHTML = rows.map(r =>
-    '<tr><td>' + r[0] + '</td><td>' + r[1] + '</td></tr>').join('');
-}
-
-function renderCal() {
-  const e = x => (x === null || x === undefined) ? '—' : Number(x).toExponential(6);
-  let rows = '';
-  for (let i = 0; i < 4; i++) {
-    rows += '<tr><td>ADC_a(' + (i + 1) + ') / ADC_b(' + (i + 1) + ')</td><td>' +
-            e(cal.ADC_a[i]) + ' / ' + e(cal.ADC_b[i]) + '</td></tr>';
-  }
-  rows += '<tr><td>DAC_a / DAC_b lus par Init</td><td>' + e(cal.DAC_a) + ' / ' + e(cal.DAC_b) + '</td></tr>';
-  $('calTable').innerHTML = rows;
-}
-
-/* --- Connexion BLE --------------------------------------------------------- */
+/* --- BLE connection ------------------------------------------------------- */
 async function connect() {
   if (!navigator.bluetooth) {
-    setStatus('Web Bluetooth indisponible dans ce navigateur', 'busy');
-    log('navigator.bluetooth absent. Sur iPad, ouvrir cette page dans Bluefy ou WebBLE.', 'err');
+    setStatus('Web Bluetooth unavailable in this browser', 'busy');
+    log('navigator.bluetooth missing. On iPad use Bluefy or WebBLE; on Android use Chrome.', 'err');
     return;
   }
   try {
-    setStatus('Recherche de l\'appareil…', 'busy');
-    // Le .bas filtre sur les noms commençant par "SUWED".
+    setStatus('Looking for a device…', 'busy');
     dev = await navigator.bluetooth.requestDevice({
       filters: [{ namePrefix: 'SUWED' }],
       optionalServices: [NUS_SERVICE]
@@ -380,71 +311,60 @@ async function connect() {
     devName = dev.name || 'SUWED';
     dev.addEventListener('gattserverdisconnected', onDisconnected);
     await openGatt();
-  } catch (err) {
-    setStatus('Connexion annulée ou échouée');
-    log('requestDevice : ' + err.message, 'err');
+  } catch (e) {
+    setStatus('Connection cancelled or failed');
+    log('requestDevice: ' + e.message, 'err');
   }
 }
-
 async function openGatt() {
-  setStatus('Connexion à ' + devName + '…', 'busy');
+  setStatus('Connecting to ' + devName + '…', 'busy');
   gatt = await dev.gatt.connect();
-  log('GATT connecté', 'ok');
   const svc = await gatt.getPrimaryService(NUS_SERVICE);
   chWrite  = await svc.getCharacteristic(NUS_WRITE);
   chNotify = await svc.getCharacteristic(NUS_NOTIFY);
   chNotify.addEventListener('characteristicvaluechanged', onNotify);
   await chNotify.startNotifications();
-  log('Caractéristiques lecture/écriture trouvées', 'ok');
-  setStatus(devName + ' connecté', 'on');
-  enable(true);
+  log('Connected to ' + devName, 'ok');
+  setStatus(devName + ' connected', 'on');
+  enable(true); renderOd();
 }
-
 function onDisconnected() {
-  enable(false);
-  clearWatchdog();
-  cs.run = 0;
-  if (userDisconnect) { userDisconnect = false; setStatus('Déconnecté'); return; }
-  setStatus('Connexion perdue — reconnexion…', 'busy');
-  log('Connexion perdue', 'err');
-  // Le .bas rappelle ble.connect() ; ici une tentative unique différée.
+  enable(false); clearWatchdog(); cs.run = 0;
+  if (userDisconnect) { userDisconnect = false; setStatus('Disconnected'); return; }
+  setStatus('Connection lost — reconnecting…', 'busy');
+  log('Connection lost', 'err');
   setTimeout(() => {
     if (!dev) return;
-    openGatt().catch(e => { setStatus('Reconnexion échouée'); log('Reconnexion : ' + e.message, 'err'); });
+    openGatt().catch(e => { setStatus('Reconnection failed'); log('Reconnect: ' + e.message, 'err'); });
   }, 1500);
 }
-
 function enable(on) {
   ['btnInit', 'btnStart', 'btnOff'].forEach(id => $(id).disabled = !on);
-  $('btnConnect').textContent = on ? 'Déconnecter' : 'Connecter';
+  $('btnConnect').textContent = on ? 'Disconnect' : 'Connect';
 }
 
-/* --- Envoi de commande (sendToUWED) --------------------------------------- */
+/* --- Command transmission (sendToUWED) ------------------------------------ */
 function fmtParam(p) {
   const s = String(Math.trunc(p));
   return (PARAM_LEADING_SPACE && p >= 0) ? ' ' + s : s;
 }
-
 async function sendToUWED(str) {
   if (!chWrite) return;
-  const bytes = new Uint8Array(str.length);
-  for (let i = 0; i < str.length; i++) bytes[i] = str.charCodeAt(i) & 0xff;
+  const b = new Uint8Array(str.length);
+  for (let i = 0; i < str.length; i++) b[i] = str.charCodeAt(i) & 0xff;
   try {
-    if (chWrite.writeValueWithResponse) await chWrite.writeValueWithResponse(bytes);
-    else await chWrite.writeValue(bytes);
+    if (chWrite.writeValueWithResponse) await chWrite.writeValueWithResponse(b);
+    else await chWrite.writeValue(b);
     log('TX ' + str, 'tx');
-  } catch (e) {
-    log('TX échec ' + str + ' : ' + e.message, 'err');
-  }
+  } catch (e) { log('TX failed ' + str + ': ' + e.message, 'err'); }
 }
 
-/* --- Pile de commandes (CS_*) --------------------------------------------- */
+/* --- Command stack (CS_*) ------------------------------------------------- */
 function csReset() { cs.names = []; cs.params = []; cs.ri = 0; cs.run = 0; cs.wait = 0; }
-function csAdd(name, param) { cs.names.push(name); cs.params.push(param); }
-
+function csAdd(n, p) { cs.names.push(n); cs.params.push(p); }
 function csSendPending() {
-  const n = cs.names[cs.ri], p = cs.params[cs.ri];
-  sendToUWED(n + '(' + fmtParam(p) + ')');
+  const n = cs.names[cs.ri];
+  sendToUWED(n + '(' + fmtParam(cs.params[cs.ri]) + ')');
   armWatchdog(n);
 }
 function csStart() {
@@ -453,114 +373,85 @@ function csStart() {
   pts = []; lastIndex = -1;
   csSendPending();
 }
-
-/* [DIFF] Le .bas ne réémet une commande qu'après 5 trames non concordantes,
-   donc jamais en cas de silence total. Chien de garde temporel ajouté, désactivé
-   pendant "M" pour ne pas relancer un scan en cours. */
+/* [DIFF] The .bas only resends after 5 mismatching frames, so never on total
+   silence. Time-based watchdog added, disabled during "M". */
 function armWatchdog(name) {
   clearWatchdog();
   if (name === 'M') return;
   watchdog = setTimeout(() => {
     if (!cs.run) return;
-    if (retries++ < 5) { log('Pas de réponse, réémission', 'err'); csSendPending(); }
-    else { cs.run = 0; setStatus('Aucune réponse de l\'appareil'); log('Abandon après 5 tentatives', 'err'); }
+    if (retries++ < 5) { log('No reply, resending', 'err'); csSendPending(); }
+    else { cs.run = 0; setStatus('No reply from device'); log('Giving up after 5 attempts', 'err'); }
   }, 2500);
 }
 function clearWatchdog() { if (watchdog) { clearTimeout(watchdog); watchdog = null; } retries = 0; }
 
 function onNotify(ev) {
   const dv = ev.target.value;
-  const a = new Uint8Array(dv.buffer, dv.byteOffset, dv.byteLength);
-  csProc(a);
+  csProc(new Uint8Array(dv.buffer, dv.byteOffset, dv.byteLength));
 }
-
 function csProc(a) {
-  if (a.length < 2) return;
-  if (!cs.run) return;
-
-  const comType = a[1];
-  const expected = cs.names[cs.ri];
+  if (a.length < 2 || !cs.run) return;
+  const comType = a[1], expected = cs.names[cs.ri];
   if (expected === undefined) return;
 
   if (expected.charCodeAt(0) === comType - 32) {
-    // Commande acquittée (l'appareil répond en minuscule).
-    clearWatchdog();
-    cs.ri++;
-    cs.wait = 0;
+    clearWatchdog(); cs.ri++; cs.wait = 0;
     log('RX ack ' + String.fromCharCode(comType), 'rx');
-
-    if (comType === 0x74) parseRegister(a);      // 't' : valeur de registre
-
+    if (comType === 0x74) parseRegister(a);           // 't'
     if (cs.ri < cs.names.length) csSendPending();
     else { cs.run = 0; csDone(); }
     return;
   }
-
   if (expected === 'M') {
-    if (comType === 0x4d) {                      // 'M' : trame de données
-      procData(a);
-    } else if (comType === 0x71) {               // 'q' : scan terminé
-      clearWatchdog();
-      cs.ri++; cs.wait = 0;
+    if (comType === 0x4d) procData(a);                // 'M' data frame
+    else if (comType === 0x71) {                      // 'q' scan complete
+      clearWatchdog(); cs.ri++; cs.wait = 0;
       if (cs.ri < cs.names.length) csSendPending();
       else { cs.run = 0; csDone(); }
     }
     return;
   }
-
   cs.wait++;
   if (cs.wait > 5) { csSendPending(); cs.wait = 0; }
 }
-
 function csDone() {
   clearWatchdog();
   if (comMODE === 1) {
-    setStatus('Mesure terminée — ' + pairCount() + ' points SWV', 'on');
-    log('Séquence de mesure terminée', 'ok');
-    openExport();                                 // remplace EmailData
+    setStatus('Measurement complete — ' + pairCount() + ' points', 'on');
+    log('Measurement sequence complete', 'ok');
+    openSave();
   } else {
     applyRegisters();
-    setStatus(devName + ' — calibration chargée, prêt', 'on');
-    log('Calibration chargée', 'ok');
+    setStatus(devName + ' — calibration loaded, ready', 'on');
+    log('Calibration loaded', 'ok');
   }
   refreshButtons();
 }
 
-/* --- Registres (commande T / réponse t) ----------------------------------- */
+/* --- Registers (T / t) ---------------------------------------------------- */
 function parseRegister(a) {
   let s = '';
-  for (let i = 3; i <= 19 && i < a.length; i++) {   // .bas : octets 4..20 (base 1)
-    if (a[i] !== 0x20) s += String.fromCharCode(a[i]);
-  }
+  for (let i = 3; i <= 19 && i < a.length; i++) if (a[i] !== 0x20) s += String.fromCharCode(a[i]);
   regsi++;
   if (regsi <= 20) regs[regsi - 1] = s;
-  log('RX reg ' + regsi + ' = ' + s, 'rx');
 }
-
 function applyRegisters() {
-  const v = i => parseFloat(regs[i]) || 0;        // VAL() du .bas
-  cal.DAC_a   = v(4) / (-1e11);
-  cal.DAC_b   = v(5) / 1e6;
+  const v = i => parseFloat(regs[i]) || 0;
+  cal.DAC_a = v(4) / (-1e11);
+  cal.DAC_b = v(5) / 1e6;
   cal.ADC_a[0] = v(6)  / 1e8;  cal.ADC_b[0] = v(7)  / 1e3;
   cal.ADC_a[1] = v(8)  / 1e9;  cal.ADC_b[1] = v(9)  / 1e4;
   cal.ADC_a[2] = v(10) / 1e10; cal.ADC_b[2] = v(11) / 1e5;
   cal.ADC_a[3] = v(12) / 1e11; cal.ADC_b[3] = v(13) / 1e6;
-
-  // [DIFF] optionnel : le .bas calcule DAC_a/DAC_b sans jamais les appliquer.
-  if ($('applyDac').checked && cal.DAC_a) {
-    cal.pot_a = cal.DAC_a; cal.pot_b = cal.DAC_b;
-    $('pot_a').value = cal.DAC_a.toExponential(6);
-    $('pot_b').value = cal.DAC_b.toFixed(6);
-    computeDerived(); renderDerived();
-    log('Calibration DAC appliquée à l\'axe des potentiels', 'ok');
-  }
-  renderCal();
+  /* [DIFF] As in the .bas, DAC_a/DAC_b are read but NOT applied to pot_a/pot_b. */
 }
 
-/* --- Séquences (InitializeUWED / ReadRegisters) --------------------------- */
+/* --- Sequences ------------------------------------------------------------ */
 function initializeUWED() {
   readConfig();
   pts = []; lastIndex = -1;
+  measuredSample = sanitize($('sampleName').value);
   comMODE = 1;
   csReset();
   csAdd('A', der.D_start);
@@ -568,7 +459,7 @@ function initializeUWED() {
   csAdd('S', 14);
   csAdd('U', cfg.ShutDownTime * 1000);
   csAdd('U', 1);
-  csAdd('K', cfg.TransmissionMode);
+  csAdd('K', TRANSMISSION_MODE);
   csAdd('B', cfg.GAIN - 1);
   csAdd('E', der.D_T);
   csAdd('J', cfg.t_wait);
@@ -582,63 +473,46 @@ function initializeUWED() {
   csAdd('L', der.N_Steps);
   csAdd('M', 0);
   csStart();
-  setStatus('Mesure en cours…', 'busy');
+  setStatus('Measuring…', 'busy');
   draw();
 }
-
 function readRegisters() {
   readConfig();
-  comMODE = 0;
-  regs = []; regsi = 0;
+  comMODE = 0; regs = []; regsi = 0;
   csReset();
   csAdd('X', 0);
   csAdd('S', 14);
   csAdd('U', cfg.ShutDownTime * 1000);
   for (let i = 1; i <= 20; i++) csAdd('T', i - 1);
   csStart();
-  setStatus('Lecture des registres…', 'busy');
+  setStatus('Reading registers…', 'busy');
 }
 
-/* --- Décodage des données (procData) -------------------------------------- */
-function beVal(a, begi, endi) {            // ConvertToNumberBin, indices base 0
-  let sum = a[begi];
-  for (let i = begi + 1; i <= endi; i++) sum = sum * 256 + a[i];
-  return sum;
-}
-
+/* --- Data decoding (procData) -------------------------------------------- */
+function beVal(a, b, e) { let s = a[b]; for (let i = b + 1; i <= e; i++) s = s * 256 + a[i]; return s; }
 function pushPoint(a, gi, tsA, tsB, vA, vB, aA, aB) {
-  const G = a[gi];
-  const gIdx = Math.min(3, Math.max(0, G));       // garde : ADC_a(G+1) du .bas
-  const dVr = beVal(a, vA, vB);
-  const dADC = beVal(a, aA, aB);
+  const G = a[gi], gIdx = Math.min(3, Math.max(0, G));
+  const dVr = beVal(a, vA, vB), dADC = beVal(a, aA, aB);
   pts.push({
-    G: G,
-    Ts: beVal(a, tsA, tsB),
-    dVr: dVr,
+    G: G, Ts: beVal(a, tsA, tsB), dVr: dVr,
     Vr: dVr * cal.pot_a + cal.pot_b,
     dADC: dADC,
     IuA: cal.ADC_a[gIdx] * dADC + cal.ADC_b[gIdx]
   });
 }
-
 function procData(a) {
-  if (a[0] === lastIndex) return;                 // trame dupliquée
+  if (a[0] === lastIndex) return;
   lastIndex = a[0];
   if (a[1] !== 0x4d || a.length < 16) return;
   if (pts.length + 2 > NR_DATA_POINTS) return;
-
-  pushPoint(a, 2,  3, 4,  5, 6,   7, 8);          // .bas : octets 3..9
-  pushPoint(a, 9, 10, 11, 12, 13, 14, 15);        // .bas : octets 10..16
-
-  setStatus('Réception des données… ' + pairCount() + ' points', 'busy');
-  $('ptCount').textContent = pairCount() + ' pts';
-  draw();
-  refreshButtons();
+  pushPoint(a, 2,  3,  4,  5,  6,   7,  8);
+  pushPoint(a, 9, 10, 11, 12, 13, 14, 15);
+  setStatus('Receiving data…', 'busy');
+  draw(); refreshButtons();
 }
 
-/* --- Voltammogramme SWV : (V1+V2)/2 vs I2-I1 ------------------------------ */
+/* --- SWV curve: (V1+V2)/2 vs I2-I1 --------------------------------------- */
 function pairCount() { return Math.floor(pts.length / 2); }
-
 function swvPairs() {
   const out = [];
   for (let k = 0; k < pairCount(); k++) {
@@ -648,8 +522,25 @@ function swvPairs() {
   return out;
 }
 
-/* --- Tracé ---------------------------------------------------------------- */
+/* --- Plot ----------------------------------------------------------------- */
 const cv = $('plot'), ctx = cv.getContext('2d');
+
+/* Round tick step: X spans exactly Start..End, gridlines on round values. */
+function niceStep(range, maxTicks) {
+  const cands = [0.01, 0.02, 0.025, 0.05, 0.1, 0.2, 0.25, 0.5, 1, 2, 2.5, 5, 10, 20, 50, 100, 200, 500, 1000];
+  for (const s of cands) if (range / s <= maxTicks) return s;
+  return cands[cands.length - 1];
+}
+function ticksIn(lo, hi, step) {
+  const out = [];
+  const first = Math.ceil(lo / step - 1e-9) * step;
+  for (let v = first; v <= hi + 1e-9; v += step) out.push(Math.abs(v) < 1e-12 ? 0 : v);
+  return out;
+}
+function fmtTick(v, step) {
+  const dec = Math.max(0, -Math.floor(Math.log10(step)) + (String(step).indexOf('5') > 1 ? 1 : 0));
+  return v.toFixed(Math.min(4, dec));
+}
 
 function sizeCanvas() {
   const r = cv.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
@@ -660,13 +551,16 @@ function sizeCanvas() {
 }
 
 function draw() {
-  const w = cv.width / (window.devicePixelRatio || 1);
-  const h = cv.height / (window.devicePixelRatio || 1);
-  const m = { l: 62, r: 14, t: 14, b: 40 };
+  const dpr = window.devicePixelRatio || 1;
+  const w = cv.width / dpr, h = cv.height / dpr;
+  const m = { l: 64, r: 16, t: 16, b: 42 };
   ctx.clearRect(0, 0, w, h);
 
   const data = swvPairs();
-  let x0 = Math.min(cfg.V_start, cfg.V_end), x1 = Math.max(cfg.V_start, cfg.V_end);
+
+  // X domain: exactly Start..End
+  const x0 = Math.min(cfg.V_start, cfg.V_end), x1 = Math.max(cfg.V_start, cfg.V_end);
+  // Y domain: dynamic autoscale on min/max
   let y0 = -100, y1 = 100;
   if (data.length > 1) {
     y0 = Math.min.apply(null, data.map(p => p[1]));
@@ -677,101 +571,222 @@ function draw() {
   const X = v => m.l + (v - x0) / (x1 - x0) * (w - m.l - m.r);
   const Y = v => h - m.b - (v - y0) / (y1 - y0) * (h - m.t - m.b);
 
-  // grille et axes
+  const xStep = niceStep(x1 - x0, Math.max(3, Math.floor((w - m.l - m.r) / 48)));
+  const yStep = niceStep(y1 - y0, 6);
+
   ctx.strokeStyle = '#223037'; ctx.lineWidth = 1;
   ctx.fillStyle = '#8fa3ad'; ctx.font = '11px ui-monospace,Menlo,monospace';
+
   ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
-  for (let i = 0; i <= 4; i++) {
-    const yv = y0 + (y1 - y0) * i / 4, py = Y(yv);
+  for (const yv of ticksIn(y0, y1, yStep)) {
+    const py = Y(yv);
     ctx.beginPath(); ctx.moveTo(m.l, py); ctx.lineTo(w - m.r, py); ctx.stroke();
-    ctx.fillText(yv.toPrecision(3), m.l - 8, py);
+    ctx.fillText(fmtTick(yv, yStep), m.l - 8, py);
   }
   ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-  for (let i = 0; i <= 5; i++) {
-    const xv = x0 + (x1 - x0) * i / 5, px = X(xv);
+  for (const xv of ticksIn(x0, x1, xStep)) {
+    const px = X(xv);
     ctx.beginPath(); ctx.moveTo(px, m.t); ctx.lineTo(px, h - m.b); ctx.stroke();
-    ctx.fillText(xv.toFixed(2), px, h - m.b + 8);
+    ctx.fillText(fmtTick(xv, xStep), px, h - m.b + 8);
   }
+  // frame
+  ctx.strokeStyle = '#33454e';
+  ctx.strokeRect(m.l, m.t, w - m.l - m.r, h - m.t - m.b);
+
   ctx.fillStyle = '#8fa3ad'; ctx.font = '12px -apple-system,system-ui,sans-serif';
-  ctx.fillText('Potentiel travail / réf. (V)', (m.l + w - m.r) / 2, h - 18);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+  ctx.fillText('Potential working vs ref (V)', (m.l + w - m.r) / 2, h - 8);
   ctx.save();
-  ctx.translate(14, (m.t + h - m.b) / 2); ctx.rotate(-Math.PI / 2);
-  ctx.textBaseline = 'top'; ctx.fillText('Courant électrode travail (µA)', 0, 0);
+  ctx.translate(15, (m.t + h - m.b) / 2); ctx.rotate(-Math.PI / 2);
+  ctx.textBaseline = 'top'; ctx.fillText('Current working electrode (µA)', 0, 0);
   ctx.restore();
 
-  // trace
   if (data.length > 1) {
     ctx.strokeStyle = '#7be38c'; ctx.lineWidth = 2; ctx.beginPath();
     data.forEach((p, i) => i ? ctx.lineTo(X(p[0]), Y(p[1])) : ctx.moveTo(X(p[0]), Y(p[1])));
     ctx.stroke();
   }
-  $('plotmeta').textContent = data.length
-    ? data.length + ' pts   ' + data[data.length - 1][0].toFixed(3) + ' V'
-    : 'SWV — SkinUWED ESP32';
+  const nm = $('sampleName').value.trim();
+  $('plotmeta').textContent = nm || (data.length ? '' : 'Square wave voltammetry');
 }
 
-/* --- Export (remplace EmailData / OPEN … FOR OUTPUT) ---------------------- */
+/* --- File content --------------------------------------------------------- */
 function exportText() {
   return swvPairs().map(p => p[0] + ' ' + p[1]).join('\n') + '\n';
 }
 
-function openExport() {
-  const n = pairCount();
-  $('expInfo').textContent = n + ' points — deux colonnes séparées par un espace : potentiel (V), courant différentiel (µA).';
-  $('expText').value = exportText();
-  $('dlgExport').showModal();
+/* --- OneDrive (Microsoft Graph, PKCE, no external library) ---------------- */
+/* [UNVERIFIED] Needs an Azure AD app registration (MS_CLIENT_ID) and has not
+   been tested inside Bluefy — the OAuth redirect may behave differently there. */
+const od = {
+  get token()   { try { return JSON.parse(localStorage.getItem('od_token') || 'null'); } catch (e) { return null; } },
+  set token(t)  { localStorage.setItem('od_token', JSON.stringify(t)); },
+  get ready()   { return !!(MS_CLIENT_ID && this.token && this.token.refresh_token); }
+};
+const redirectUri = () => location.origin + location.pathname;
+
+function b64url(buf) {
+  return btoa(String.fromCharCode.apply(null, new Uint8Array(buf)))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+async function sha256(str) {
+  return crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+}
+async function odSignIn() {
+  if (!MS_CLIENT_ID) { log('MS_CLIENT_ID is empty — OneDrive not configured', 'err'); return; }
+  const verifier = b64url(crypto.getRandomValues(new Uint8Array(48)));
+  localStorage.setItem('od_verifier', verifier);
+  const challenge = b64url(await sha256(verifier));
+  const u = new URL(MS_AUTH);
+  u.search = new URLSearchParams({
+    client_id: MS_CLIENT_ID, response_type: 'code', redirect_uri: redirectUri(),
+    scope: MS_SCOPES, code_challenge: challenge, code_challenge_method: 'S256',
+    prompt: 'select_account'
+  }).toString();
+  location.href = u.toString();
+}
+async function odHandleRedirect() {
+  const p = new URLSearchParams(location.search);
+  const code = p.get('code');
+  if (!code) return;
+  history.replaceState({}, '', redirectUri());
+  const verifier = localStorage.getItem('od_verifier') || '';
+  try {
+    const r = await fetch(MS_TOKEN, {
+      method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: MS_CLIENT_ID, grant_type: 'authorization_code', code: code,
+        redirect_uri: redirectUri(), code_verifier: verifier, scope: MS_SCOPES
+      })
+    });
+    const t = await r.json();
+    if (!t.access_token) throw new Error(t.error_description || 'no token');
+    t.expires_at = Date.now() + (t.expires_in - 120) * 1000;
+    od.token = t;
+    log('OneDrive signed in', 'ok');
+  } catch (e) { log('OneDrive sign-in failed: ' + e.message, 'err'); }
+  renderOd();
+}
+async function odAccessToken() {
+  const t = od.token;
+  if (!t) throw new Error('not signed in');
+  if (t.expires_at && Date.now() < t.expires_at) return t.access_token;
+  const r = await fetch(MS_TOKEN, {
+    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: MS_CLIENT_ID, grant_type: 'refresh_token',
+      refresh_token: t.refresh_token, scope: MS_SCOPES
+    })
+  });
+  const nt = await r.json();
+  if (!nt.access_token) throw new Error(nt.error_description || 'refresh failed');
+  nt.expires_at = Date.now() + (nt.expires_in - 120) * 1000;
+  if (!nt.refresh_token) nt.refresh_token = t.refresh_token;
+  od.token = nt;
+  return nt.access_token;
+}
+function odFolder() {
+  return OD_ROOT + '/' + (devName || 'SUWED') + '/' + today() + '/raw';
+}
+async function odUpload(fileName, text) {
+  const tok = await odAccessToken();
+  const path = odFolder() + '/' + fileName;
+  const url = 'https://graph.microsoft.com/v1.0/me/drive/root:/' +
+              path.split('/').map(encodeURIComponent).join('/') + ':/content';
+  const r = await fetch(url, {
+    method: 'PUT',
+    headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'text/plain' },
+    body: text
+  });
+  if (!r.ok) throw new Error('Graph ' + r.status + ' ' + (await r.text()).slice(0, 160));
+  return path;
+}
+function renderOd() {
+  const el = $('odStatus'), b = $('btnOd');
+  $('odPath').textContent = odFolder() + '/<file>.txt';
+  if (!MS_CLIENT_ID) {
+    el.textContent = 'Not configured. Add the Azure AD client ID to MS_CLIENT_ID in the source.';
+    b.disabled = true; b.textContent = 'Sign in to OneDrive';
+    return;
+  }
+  b.disabled = false;
+  if (od.ready) { el.textContent = 'Signed in. Files upload to the folder below.'; b.textContent = 'Sign out'; }
+  else { el.textContent = 'Not signed in.'; b.textContent = 'Sign in to OneDrive'; }
 }
 
-async function shareFile() {
-  const name = ($('fname').value.trim() || 'mesure') + '.txt';
-  const text = exportText();
+/* --- Save dialog ---------------------------------------------------------- */
+function openSave() {
+  const base = measuredSample || sanitize($('sampleName').value) || 'mesure';
+  $('fname').value = base;
+  $('savePath').textContent = od.ready ? 'OneDrive → ' + odFolder() + '/' : 'Local file only (OneDrive not signed in)';
+  $('localCopy').checked = !od.ready;
+  $('dlgSave').showModal();
+}
+async function localSave(name, text) {
   const file = new File([text], name, { type: 'text/plain' });
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    try { await navigator.share({ files: [file], title: name }); return; }
-    catch (e) { if (e.name === 'AbortError') return; log('Partage : ' + e.message, 'err'); }
+    try { await navigator.share({ files: [file], title: name }); return true; }
+    catch (e) { if (e.name === 'AbortError') return false; }
   }
   const url = URL.createObjectURL(new Blob([text], { type: 'text/plain' }));
   const a = document.createElement('a');
-  a.href = url; a.download = name; document.body.appendChild(a); a.click();
-  document.body.removeChild(a); setTimeout(() => URL.revokeObjectURL(url), 2000);
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+  return true;
+}
+async function doSave() {
+  const name = (sanitize($('fname').value) || 'mesure') + '.txt';
+  const text = exportText();
+  const alsoLocal = $('localCopy').checked;
+  $('btnDoSave').disabled = true;
+  let cloudOk = false;
+  if (od.ready) {
+    setStatus('Uploading to OneDrive…', 'busy');
+    try { const p = await odUpload(name, text); cloudOk = true; log('Saved to OneDrive: ' + p, 'ok'); }
+    catch (e) { log('OneDrive upload failed: ' + e.message, 'err'); }
+  }
+  if (alsoLocal || !cloudOk) await localSave(name, text);
+  $('btnDoSave').disabled = false;
+  $('dlgSave').close();
+  setStatus(cloudOk ? 'Saved to OneDrive — ' + name : 'Saved locally — ' + name, 'on');
 }
 
-/* --- Câblage de l'interface ----------------------------------------------- */
+/* --- UI wiring ------------------------------------------------------------ */
 function refreshButtons() {
   const has = pairCount() > 0;
   $('btnExport').disabled = !has;
   $('btnClear').disabled = !has;
-  $('ptCount').textContent = has ? pairCount() + ' pts' : '';
 }
-
 $('btnConnect').onclick = async () => {
   if (gatt && gatt.connected) { userDisconnect = true; gatt.disconnect(); enable(false); return; }
   await connect();
 };
-$('btnInit').onclick  = () => { log('— Init : lecture des registres —'); readRegisters(); };
-$('btnStart').onclick = () => { log('— Démarrage de la mesure —'); initializeUWED(); refreshButtons(); };
-$('btnOff').onclick   = () => { setStatus('Extinction demandée', 'busy'); sendToUWED('Q()'); };
-$('btnClear').onclick = () => { pts = []; lastIndex = -1; draw(); refreshButtons(); };
-$('btnExport').onclick = openExport;
+$('btnInit').onclick   = () => { log('— Initialize: reading registers —'); readRegisters(); };
+$('btnStart').onclick  = () => { log('— Starting measurement —'); initializeUWED(); refreshButtons(); };
+$('btnOff').onclick    = () => { setStatus('Switching off', 'busy'); sendToUWED('Q()'); };
+$('btnClear').onclick  = () => { pts = []; lastIndex = -1; draw(); refreshButtons(); };
+$('btnExport').onclick = openSave;
 $('btnClearLog').onclick = () => { $('log').textContent = ''; };
-$('btnCloseDlg').onclick = () => $('dlgExport').close();
-$('btnShare').onclick = shareFile;
-$('btnCopy').onclick = async () => {
-  try { await navigator.clipboard.writeText(exportText()); $('btnCopy').textContent = 'Copié'; }
-  catch (e) { $('expText').select(); document.execCommand('copy'); $('btnCopy').textContent = 'Copié'; }
-  setTimeout(() => $('btnCopy').textContent = 'Copier', 1500);
+$('btnCancelSave').onclick = () => $('dlgSave').close();
+$('btnDoSave').onclick = doSave;
+$('btnOd').onclick = () => {
+  if (od.ready) { localStorage.removeItem('od_token'); renderOd(); log('OneDrive signed out'); }
+  else odSignIn();
 };
-
-['V_start','V_end','freq','V_step','V_amp','t_wait','GAIN','TransmissionMode','ShutDownTime','pot_a','pot_b','intMode']
+$('sampleName').addEventListener('input', draw);
+['V_start','V_end','freq','V_step','V_amp','t_wait','GAIN','ShutDownTime']
   .forEach(id => $(id).addEventListener('change', () => { readConfig(); draw(); }));
 
 window.addEventListener('resize', sizeCanvas);
 readConfig();
 sizeCanvas();
 refreshButtons();
+renderOd();
+odHandleRedirect();
 if (!navigator.bluetooth) {
-  setStatus('Web Bluetooth indisponible — ouvrir dans Bluefy', 'busy');
-  log('navigator.bluetooth absent. Safari iPadOS n\'expose pas Web Bluetooth ; utiliser Bluefy ou WebBLE.', 'err');
+  setStatus('Web Bluetooth unavailable — open in Bluefy', 'busy');
+  log('navigator.bluetooth missing. Safari on iPadOS does not expose Web Bluetooth.', 'err');
 }
 </script>
 </body>
