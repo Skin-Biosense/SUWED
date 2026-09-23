@@ -129,7 +129,7 @@
 
 <header>
   <h1>Skin-Biosense</h1>
-  <span class="ver mono">version 5.1.3</span>
+  <span class="ver mono">version 5.1.4</span>
 </header>
 
 <div class="status">
@@ -260,7 +260,7 @@
 <script>
 "use strict";
 /* ============================================================================
-   Skin-Biosense v5.1.3
+   Skin-Biosense v5.1.4
    Port of the techBASIC "SUWED" program (Fluika OÜ) to Web Bluetooth.
    Runs in any browser exposing navigator.bluetooth — Bluefy / WebBLE on iPadOS,
    Chrome / Edge on Android. Deviations from the .bas are marked [DIFF].
@@ -990,19 +990,19 @@ function baseName(path, fallback) {
   return parts[parts.length - 1] || fallback;
 }
 
-/* overwrite=false lets the script pick a free name in its own folder (used
-   once, for raw). overwrite=true places the file under the exact name given,
-   replacing any existing file — used for treated/peaks so all three files of
-   one run share the name raw actually resolved to, instead of each folder
-   resolving its own suffix independently. */
-async function driveUpload(fileName, text, kind, overwrite) {
+/* unique=true asks the script for a free name in its own folder (used once,
+   for raw). unique=false (or omitted) places the file under the exact name
+   given, replacing any existing file — used for treated/peaks so all three
+   files of one run share the name raw actually resolved to, instead of each
+   folder resolving its own suffix independently. Matches Code.gs's d.unique. */
+async function driveUpload(fileName, text, kind, unique) {
   kind = kind || 'raw';
   const payload = JSON.stringify({
     token: GAS_TOKEN,
     device: devName || 'SUWED',
     date: today(),
     kind: kind,
-    overwrite: !!overwrite,
+    unique: !!unique,
     sample: measuredSample || '',
     filename: fileName,
     points: pairCount(),
@@ -1132,7 +1132,7 @@ async function doSave() {
     if (!drive.ready) break;
     cloudTried++;
     try {
-      const r = await driveUpload(name, j.text, j.kind, j.kind !== 'raw');
+      const r = await driveUpload(name, j.text, j.kind, j.kind === 'raw');
       if (j.kind === 'raw' && r.name) name = r.name;
       if (r.confirmed) cloudOk++;
       log('Drive ' + j.kind + ': ' + r.path + (r.confirmed ? '' : ' (unconfirmed)'),
@@ -1224,7 +1224,7 @@ async function savePeaksOnly() {
   $('btnSavePeaks').disabled = true;
   if (drive.ready) {
     try {
-      const r = await driveUpload(base + '.txt', text, 'peaks', true);
+      const r = await driveUpload(base + '.txt', text, 'peaks', false);
       log('Drive peaks: ' + r.path + (r.confirmed ? ' (replaced)' : ' (unconfirmed)'),
           r.confirmed ? 'ok' : 'err');
       setStatus('Peaks saved — ' + shownPeaks.length + ' peak(s)', 'on');
