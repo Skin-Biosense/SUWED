@@ -129,7 +129,7 @@
 
 <header>
   <h1>Skin-Biosense</h1>
-  <span class="ver mono">version 5.1.4</span>
+  <span class="ver mono">version 5.1.3</span>
 </header>
 
 <div class="status">
@@ -260,7 +260,7 @@
 <script>
 "use strict";
 /* ============================================================================
-   Skin-Biosense v5.1.4
+   Skin-Biosense v5.1.2
    Port of the techBASIC "SUWED" program (Fluika OÜ) to Web Bluetooth.
    Runs in any browser exposing navigator.bluetooth — Bluefy / WebBLE on iPadOS,
    Chrome / Edge on Android. Deviations from the .bas are marked [DIFF].
@@ -303,8 +303,8 @@ let regs = [], regsi = 0;
 let pts = [], lastIndex = -1;
 let watchdog = null, retries = 0;
 let measuredSample = '';
-let framesLost = 0, dupFrames = 0, stopped = false;
-let lastSavedName = '';   // filename the raw upload actually resolved to
+let framesLost = 0, stopped = false;
+let lastSavedName = '';   // name Code.gs actually used for this run's raw file
 let proc = null;                 // result of runTreatment()
 let shownPeaks = [];             // peaks after threshold and range filtering
 let viewMode = 'raw';
@@ -490,8 +490,7 @@ function csDone() {
     $('btnStop').disabled = true;
     const lost = framesLost ? ' — ' + framesLost + ' frames lost' : '';
     setStatus('Measurement complete — ' + pairCount() + ' points' + lost, lost ? 'busy' : 'on');
-    log('Measurement complete: ' + pairCount() + ' points, ' + framesLost + ' lost' +
-        (dupFrames ? ', ' + dupFrames + ' retried frame(s) ignored' : ''),
+    log('Measurement complete: ' + pairCount() + ' points, ' + framesLost + ' lost',
         framesLost ? 'err' : 'ok');
     if ($('applyTreatment').checked) runAndShowTreatment(true);
     openSave();
@@ -541,7 +540,7 @@ function applyRegisters() {
 function initializeUWED() {
   readConfig();
   if (!calLoaded) log('Warning: Initialize not run — using default calibration', 'err');
-  pts = []; lastIndex = -1; framesLost = 0; dupFrames = 0; stopped = false; lastSavedName = '';
+  pts = []; lastIndex = -1; framesLost = 0; stopped = false; lastSavedName = '';
   resetTreatment(); measuredAt = new Date();
   measuredSample = sanitize($('sampleName').value);
   comMODE = 1;
@@ -595,25 +594,14 @@ function pushPoint(a, gi, tsA, tsB, vA, vB, aA, aB) {
 }
 function procData(a) {
   if (a[0] === lastIndex) return;
-  /* Frames carry a rolling one-byte index. A forward jump means the radio
-     dropped cycles. A BACKWARD step (small diff, once folded out of the
-     mod-256 wraparound) is a stale frame re-delivered by the BLE stack —
-     not a loss — and must not be added to framesLost or re-pushed. */
+  /* Frames carry a rolling one-byte index. A jump means the radio dropped
+     cycles — the curve then looks shifted even though the sweep was correct. */
   if (lastIndex >= 0) {
     const expected = (lastIndex + 1) & 0xff;
     if (a[0] !== expected) {
-      const fwd = (a[0] - expected + 256) & 0xff;
-      if (fwd <= 128) {
-        framesLost += fwd;
-        log('Frame gap: ' + fwd + ' lost (index ' + expected + ' -> ' + a[0] + ')', 'err');
-      } else {
-        const back = 256 - fwd;
-        dupFrames++;
-        if (dupFrames === 1)
-          log('Retried frame ignored (' + back + ' step behind, index ' + a[0] +
-              ') — further repeats stay silent', 'rx');
-        return;   // stale frame: do not move lastIndex, do not push its points
-      }
+      const missed = (a[0] - expected + 256) & 0xff;
+      framesLost += missed;
+      log('Frame gap: ' + missed + ' lost (index ' + expected + ' -> ' + a[0] + ')', 'err');
     }
   }
   lastIndex = a[0];
@@ -984,17 +972,6 @@ function driveFolder(kind) {
   return DRIVE_ROOT + '/' + (devName || 'SUWED') + '/' + today() + '/' + (kind || 'raw');
 }
 
-function baseName(path, fallback) {
-  if (!path) return fallback;
-  const parts = path.split('/');
-  return parts[parts.length - 1] || fallback;
-}
-
-/* unique=true asks the script for a free name in its own folder (used once,
-   for raw). unique=false (or omitted) places the file under the exact name
-   given, replacing any existing file — used for treated/peaks so all three
-   files of one run share the name raw actually resolved to, instead of each
-   folder resolving its own suffix independently. Matches Code.gs's d.unique. */
 async function driveUpload(fileName, text, kind, unique) {
   kind = kind || 'raw';
   const payload = JSON.stringify({
@@ -1002,6 +979,9 @@ async function driveUpload(fileName, text, kind, unique) {
     device: devName || 'SUWED',
     date: today(),
     kind: kind,
+    /* Matches the deployed Code.gs: unique=true asks it to resolve a free
+       name (used once, for raw); unique=false replaces in place under the
+       exact name given (treated/peaks, so all three files of a run match). */
     unique: !!unique,
     sample: measuredSample || '',
     filename: fileName,
@@ -1017,8 +997,8 @@ async function driveUpload(fileName, text, kind, unique) {
     });
     const j = await r.json();
     if (!j.ok) throw new Error(j.error || 'script error');
-    const path = j.path || driveFolder(kind) + '/' + fileName;
-    return { confirmed: true, path: path, name: j.name || baseName(path, fileName) };
+    return { confirmed: true, name: j.name || fileName,
+             path: j.path || driveFolder(kind) + '/' + fileName };
   } catch (e) {
     // Opaque fallback: the POST is still delivered, the reply is unreadable.
     await fetch(GAS_URL, {
@@ -1027,7 +1007,8 @@ async function driveUpload(fileName, text, kind, unique) {
       body: payload
     });
     log('Drive reply unreadable (' + e.message + ') — sent without confirmation', 'err');
-    return { confirmed: false, path: driveFolder(kind) + '/' + fileName, name: fileName };
+    return { confirmed: false, name: fileName,
+             path: driveFolder(kind) + '/' + fileName };
   }
 }
 
@@ -1119,19 +1100,19 @@ async function doSave() {
     if (shownPeaks.length) jobs.push({ kind: 'peaks', text: peaksText() });
   }
 
-  /* Close right away: the upload can take a few seconds on a slow connection,
+  /* Close right away: uploading can take a few seconds on a slow connection,
      and there is no reason to make the operator wait in front of a modal for
      it. The result shows up in the status bar and the BLE log instead. */
   $('dlgSave').close();
   setStatus('Saving…', 'busy');
 
-  // Only the raw upload asks the script for a free name; treated and peaks
-  // reuse exactly that name, so the three files of one run always match.
   let name = base + '.txt', cloudOk = 0, cloudTried = 0;
   for (const j of jobs) {
     if (!drive.ready) break;
     cloudTried++;
     try {
+      // Only raw asks for a free name; treated and peaks reuse it exactly,
+      // so the three files of one run always share the same name.
       const r = await driveUpload(name, j.text, j.kind, j.kind === 'raw');
       if (j.kind === 'raw' && r.name) name = r.name;
       if (r.confirmed) cloudOk++;
@@ -1216,10 +1197,10 @@ function setView(v) {
 
 async function savePeaksOnly() {
   if (!shownPeaks.length) return;
-  // Reuse the name of the run just saved, so this replaces its peak file —
-  // not a name freshly derived from whatever the sample field says now.
-  const base = (lastSavedName || ((sanitize($('sampleName').value) ||
-                measuredSample || 'mesure') + '.txt')).replace(/\.txt$/, '');
+  // Reuse the name of the run just saved, so this replaces its peak file
+  // and stays aligned with the matching raw/treated files.
+  const base = (lastSavedName || (sanitize($('sampleName').value) ||
+                measuredSample || 'mesure') + '.txt').replace(/\.txt$/, '');
   const text = peaksText();
   $('btnSavePeaks').disabled = true;
   if (drive.ready) {
