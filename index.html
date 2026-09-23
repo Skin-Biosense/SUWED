@@ -129,7 +129,7 @@
 
 <header>
   <h1>Skin-Biosense</h1>
-  <span class="ver mono">version 5.1.4</span>
+  <span class="ver mono">version 5.1.6</span>
 </header>
 
 <div class="status">
@@ -261,7 +261,7 @@
 
 "use strict";
 /* ============================================================================
-   Skin-Biosense v5.1.4
+   Skin-Biosense v5.1.6
    Port of the techBASIC "SUWED" program (Fluika OÜ) to Web Bluetooth.
    Runs in any browser exposing navigator.bluetooth — Bluefy / WebBLE on iPadOS,
    Chrome / Edge on Android. Deviations from the .bas are marked [DIFF].
@@ -1105,7 +1105,6 @@ async function doSave() {
   const base = sanitize($('fname').value) || 'mesure';
   const alsoLocal = $('localCopy').checked;
   const alsoTreated = $('saveTreated').checked && proc;
-  $('btnDoSave').disabled = true;
 
   const jobs = [{ kind: 'raw', text: rawText() }];
   if (alsoTreated) {
@@ -1113,12 +1112,16 @@ async function doSave() {
     if (shownPeaks.length) jobs.push({ kind: 'peaks', text: peaksText() });
   }
 
+  /* Close right away: uploading can take a few seconds on a slow connection,
+     and there is no reason to make the operator wait in front of a modal for
+     it. The result shows up in the status bar and the BLE log instead. */
+  $('dlgSave').close();
+  setStatus('Saving…', 'busy');
+
   let name = base + '.txt', sent = 0;
   if (drive.ready) {
     for (const j of jobs) {
-      setStatus('Uploading ' + j.kind + '…', 'busy');
       try {
-        // Only the raw upload resolves a free name; treated and peaks reuse it.
         const r = await driveUpload(name, j.text, j.kind, j.kind === 'raw');
         if (j.kind === 'raw' && r.name) name = r.name;
         sent++;
@@ -1133,8 +1136,6 @@ async function doSave() {
     for (const j of jobs)
       await localSave(j.kind === 'raw' ? stem + '.txt' : stem + '_' + j.kind + '.txt', j.text);
   }
-  $('btnDoSave').disabled = false;
-  $('dlgSave').close();
   setStatus(sent ? 'Saved ' + sent + ' file(s) to Drive — ' + name
                  : 'Saved locally — ' + name, 'on');
 }
