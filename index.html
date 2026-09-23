@@ -129,7 +129,7 @@
 
 <header>
   <h1>Skin-Biosense</h1>
-  <span class="ver mono">version 5.1.1</span>
+  <span class="ver mono">version 5.1.4</span>
 </header>
 
 <div class="status">
@@ -258,9 +258,10 @@
 </dialog>
 
 <script>
+
 "use strict";
 /* ============================================================================
-   Skin-Biosense v5.1.2
+   Skin-Biosense v5.1.4
    Port of the techBASIC "SUWED" program (Fluika OÜ) to Web Bluetooth.
    Runs in any browser exposing navigator.bluetooth — Bluefy / WebBLE on iPadOS,
    Chrome / Edge on Android. Deviations from the .bas are marked [DIFF].
@@ -280,8 +281,8 @@ const NR_DATA_POINTS = 1510;
 /* --- Google Drive endpoint (Apps Script web app) -------------------------- */
 /* Deploy Code.gs on capteur.skinbiosense@gmail.com, then paste the /exec URL
    and the shared token below. Both must match the script. */
-const GAS_URL   = 'https://script.google.com/macros/s/AKfycbxnk83dpXHCOL3_kqILJ2qEbT8fFgvRCPD_VJiajN27vNMGb51VF58nWqlCq72SOIRAxw/exec';               // <<< https://script.google.com/macros/s/AKfy.../exec
-const GAS_TOKEN = 'efzetf478sdrztg45erg2e1tg5-y7bft874h8thbed';               // <<< same string as TOKEN in Code.gs
+const GAS_URL   = 'https://script.google.com/macros/s/AKfycbym-Od-9xm1BHqahleR0SwcWsStXQkQyxZZd_ClvpQDqQjSjehPDRLDPYPEg74b-2ni/exec';
+const GAS_TOKEN = 'efzetf478sdrztg45erg2e1tg5-y7bft874h8thbed';   // must match TOKEN in Code.gs
 const DRIVE_ROOT = 'SUWED v5';
 
 /* --- Calibration (default values from the .bas, overwritten by Initialize) - */
@@ -303,13 +304,14 @@ let regs = [], regsi = 0;
 let pts = [], lastIndex = -1;
 let watchdog = null, retries = 0;
 let measuredSample = '';
-let framesLost = 0, stopped = false;
+let framesLost = 0, dupFrames = 0, stopped = false;
 let proc = null;                 // result of runTreatment()
 let shownPeaks = [];             // peaks after threshold and range filtering
 let viewMode = 'raw';
 let overlays = [];               // [{name, data, color}]
 let selPeak = -1;
 let measuredAt = null;
+let lastSavedName = '';   // name the script actually used for this run
 const OV_COLORS = ['#e8a33d', '#3f8fd6', '#c77dd6'];
 
 /* --- Helpers -------------------------------------------------------------- */
@@ -489,7 +491,8 @@ function csDone() {
     $('btnStop').disabled = true;
     const lost = framesLost ? ' — ' + framesLost + ' frames lost' : '';
     setStatus('Measurement complete — ' + pairCount() + ' points' + lost, lost ? 'busy' : 'on');
-    log('Measurement complete: ' + pairCount() + ' points, ' + framesLost + ' lost',
+    log('Measurement complete: ' + pairCount() + ' points, ' + framesLost + ' lost' +
+        (dupFrames ? ', ' + dupFrames + ' retried frame(s) ignored' : ''),
         framesLost ? 'err' : 'ok');
     if ($('applyTreatment').checked) runAndShowTreatment(true);
     openSave();
@@ -539,7 +542,7 @@ function applyRegisters() {
 function initializeUWED() {
   readConfig();
   if (!calLoaded) log('Warning: Initialize not run — using default calibration', 'err');
-  pts = []; lastIndex = -1; framesLost = 0; stopped = false;
+  pts = []; lastIndex = -1; framesLost = 0; dupFrames = 0; stopped = false; lastSavedName = '';
   resetTreatment(); measuredAt = new Date();
   measuredSample = sanitize($('sampleName').value);
   comMODE = 1;
@@ -593,14 +596,25 @@ function pushPoint(a, gi, tsA, tsB, vA, vB, aA, aB) {
 }
 function procData(a) {
   if (a[0] === lastIndex) return;
-  /* Frames carry a rolling one-byte index. A jump means the radio dropped
-     cycles — the curve then looks shifted even though the sweep was correct. */
+  /* Frames carry a rolling one-byte index. A forward jump means the radio
+     dropped cycles. A BACKWARD step (the small-diff case below, once folded
+     out of the mod-256 wraparound) is a stale frame re-delivered by the BLE
+     stack — not a loss — and must not be added to framesLost or re-pushed. */
   if (lastIndex >= 0) {
     const expected = (lastIndex + 1) & 0xff;
     if (a[0] !== expected) {
-      const missed = (a[0] - expected + 256) & 0xff;
-      framesLost += missed;
-      log('Frame gap: ' + missed + ' lost (index ' + expected + ' -> ' + a[0] + ')', 'err');
+      const fwd = (a[0] - expected + 256) & 0xff;
+      if (fwd <= 128) {
+        framesLost += fwd;
+        log('Frame gap: ' + fwd + ' lost (index ' + expected + ' -> ' + a[0] + ')', 'err');
+      } else {
+        const back = 256 - fwd;
+        dupFrames++;
+        if (dupFrames === 1)
+          log('Retried frame ignored (' + back + ' step behind, index ' + a[0] +
+              ') — further repeats stay silent', 'rx');
+        return;   // stale frame: do not move lastIndex, do not push its points
+      }
     }
   }
   lastIndex = a[0];
@@ -971,14 +985,16 @@ function driveFolder(kind) {
   return DRIVE_ROOT + '/' + (devName || 'SUWED') + '/' + today() + '/' + (kind || 'raw');
 }
 
-async function driveUpload(fileName, text, kind) {
+async function driveUpload(fileName, text, kind, unique) {
   kind = kind || 'raw';
   const payload = JSON.stringify({
     token: GAS_TOKEN,
     device: devName || 'SUWED',
     date: today(),
     kind: kind,
-    overwrite: kind === 'peaks',   // a manual extraction replaces the automatic one
+    /* unique: ask the script for a free name and report it back, so the other
+       two folders can reuse exactly the same name. Otherwise: replace in place. */
+    unique: !!unique,
     sample: measuredSample || '',
     filename: fileName,
     points: pairCount(),
@@ -993,7 +1009,8 @@ async function driveUpload(fileName, text, kind) {
     });
     const j = await r.json();
     if (!j.ok) throw new Error(j.error || 'script error');
-    return { confirmed: true, path: j.path || driveFolder(kind) + '/' + fileName };
+    return { confirmed: true, name: j.name || fileName,
+             path: j.path || driveFolder(kind) + '/' + fileName };
   } catch (e) {
     // Opaque fallback: the POST is still delivered, the reply is unreadable.
     await fetch(GAS_URL, {
@@ -1002,7 +1019,8 @@ async function driveUpload(fileName, text, kind) {
       body: payload
     });
     log('Drive reply unreadable (' + e.message + ') — sent without confirmation', 'err');
-    return { confirmed: false, path: driveFolder(kind) + '/' + fileName };
+    return { confirmed: false, name: fileName,
+             path: driveFolder(kind) + '/' + fileName };
   }
 }
 
@@ -1089,34 +1107,36 @@ async function doSave() {
   const alsoTreated = $('saveTreated').checked && proc;
   $('btnDoSave').disabled = true;
 
-  const jobs = [{ kind: 'raw', name: base + '.txt', text: rawText() }];
+  const jobs = [{ kind: 'raw', text: rawText() }];
   if (alsoTreated) {
-    jobs.push({ kind: 'treated', name: base + '.txt', text: treatedText() });
-    if (shownPeaks.length) jobs.push({ kind: 'peaks', name: base + '.txt', text: peaksText() });
+    jobs.push({ kind: 'treated', text: treatedText() });
+    if (shownPeaks.length) jobs.push({ kind: 'peaks', text: peaksText() });
   }
 
-  let cloudOk = 0, cloudTried = 0;
-  for (const j of jobs) {
-    if (!drive.ready) break;
-    cloudTried++;
-    setStatus('Uploading ' + j.kind + '…', 'busy');
-    try {
-      const r = await driveUpload(j.name, j.text, j.kind);
-      if (r.confirmed) cloudOk++;
-      log('Drive ' + j.kind + ': ' + r.path + (r.confirmed ? '' : ' (unconfirmed)'),
-          r.confirmed ? 'ok' : 'err');
-    } catch (e) { log('Drive ' + j.kind + ' failed: ' + e.message, 'err'); }
-  }
-  if (alsoLocal || !cloudTried) {
+  let name = base + '.txt', sent = 0;
+  if (drive.ready) {
     for (const j of jobs) {
-      const nm = j.kind === 'raw' ? j.name : base + '_' + j.kind + '.txt';
-      await localSave(nm, j.text);
+      setStatus('Uploading ' + j.kind + '…', 'busy');
+      try {
+        // Only the raw upload resolves a free name; treated and peaks reuse it.
+        const r = await driveUpload(name, j.text, j.kind, j.kind === 'raw');
+        if (j.kind === 'raw' && r.name) name = r.name;
+        sent++;
+        log('Drive ' + j.kind + ': ' + r.path + (r.confirmed ? '' : ' (unconfirmed)'),
+            r.confirmed ? 'ok' : 'err');
+      } catch (e) { log('Drive ' + j.kind + ' failed: ' + e.message, 'err'); }
     }
+    lastSavedName = name;
+  }
+  if (alsoLocal || !sent) {
+    const stem = name.replace(/\.txt$/, '');
+    for (const j of jobs)
+      await localSave(j.kind === 'raw' ? stem + '.txt' : stem + '_' + j.kind + '.txt', j.text);
   }
   $('btnDoSave').disabled = false;
   $('dlgSave').close();
-  setStatus(cloudTried ? 'Saved ' + jobs.length + ' file(s) to Drive — ' + base
-                       : 'Saved locally — ' + base, 'on');
+  setStatus(sent ? 'Saved ' + sent + ' file(s) to Drive — ' + name
+                 : 'Saved locally — ' + name, 'on');
 }
 
 /* --- Peak extraction and presentation ------------------------------------- */
@@ -1186,12 +1206,14 @@ function setView(v) {
 
 async function savePeaksOnly() {
   if (!shownPeaks.length) return;
-  const base = sanitize($('sampleName').value) || measuredSample || 'mesure';
+  // Reuse the name of the run just saved, so this replaces its peak file.
+  const base = (lastSavedName || ((sanitize($('fname').value) ||
+                sanitize($('sampleName').value) || 'mesure') + '.txt')).replace(/\.txt$/, '');
   const text = peaksText();
   $('btnSavePeaks').disabled = true;
   if (drive.ready) {
     try {
-      const r = await driveUpload(base + '.txt', text, 'peaks');
+      const r = await driveUpload(base + '.txt', text, 'peaks', false);
       log('Drive peaks: ' + r.path + (r.confirmed ? ' (replaced)' : ' (unconfirmed)'),
           r.confirmed ? 'ok' : 'err');
       setStatus('Peaks saved — ' + shownPeaks.length + ' peak(s)', 'on');
